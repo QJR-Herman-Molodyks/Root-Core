@@ -12,31 +12,51 @@ on:
 
 jobs:
   check:
-    name: Check C and Assembly Files
+    name: Check C and Assembly Files (x86_64 OS Dev)
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Set up GCC for Jeb OS
+    - name: Install dependencies (cppcheck, nasm)
       run: |
         sudo apt update
-        sudo apt install -y gcc-arm-none-eabi binutils
+        sudo apt install -y cppcheck nasm
 
     - name: Check C files for syntax errors
       run: |
-        for file in $(find . -name "*.c"); do
-          gcc -fsyntax-only "$file" || exit 1
-        done
+        FILES=$(find . -name "*.c")
+        if [ -z "$FILES" ]; then
+          echo "No .c files found, skipping."
+        else
+          for file in $FILES; do
+            gcc -m64 -ffreestanding -mno-red-zone -fsyntax-only "$file" || exit 1
+          done
+        fi
 
-    - name: Check Assembly files for syntax errors
+    - name: Check GNU Assembly (.s) files
       run: |
-        for file in $(find . -name "*.s"); do
-          as -o /dev/null "$file" || exit 1
-        done
+        FILES=$(find . -name "*.s")
+        if [ -z "$FILES" ]; then
+          echo "No .s files found, skipping."
+        else
+          for file in $FILES; do
+            as --64 -o /dev/null "$file" || exit 1
+          done
+        fi
+
+    - name: Check NASM Assembly (.asm) files
+      run: |
+        FILES=$(find . -name "*.asm")
+        if [ -z "$FILES" ]; then
+          echo "No .asm files found, skipping."
+        else
+          for file in $FILES; do
+            nasm -f elf64 "$file" -o /dev/null || exit 1
+          done
+        fi
 
     - name: Run static code analysis (cppcheck)
       run: |
-        sudo apt install -y cppcheck
         cppcheck --enable=all --inconclusive --force --quiet .
